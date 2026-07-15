@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SCANNER V4 - RK</title>
+    <title>SCANNER V4.1 - RK</title>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -166,43 +166,6 @@
             flex-direction: column; align-items: center; justify-content: center;
         }
         #reader { width: 90%; border-radius: 10px; border: 1px solid var(--carbon-border); }
-
-        /* Modal de Edición */
-        #edit-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 2000;
-            flex-direction: column; align-items: center; justify-content: center;
-            gap: 12px; padding: 20px; box-sizing: border-box;
-        }
-        .edit-card {
-            background: var(--carbon-light);
-            border: 1px solid var(--carbon-border);
-            border-radius: 12px;
-            padding: 20px;
-            width: 90%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .edit-card label {
-            font-size: 0.75rem;
-            color: var(--accent);
-            font-weight: 600;
-            margin-bottom: -4px;
-        }
-        .edit-card input, .edit-card select {
-            background: #000000;
-            color: var(--white);
-            border: 1px solid var(--carbon-border);
-            border-radius: 6px;
-            padding: 10px;
-            font-family: 'Lexend', sans-serif;
-            font-size: 0.9rem;
-            width: 100%;
-            box-sizing: border-box;
-            outline: none;
-        }
 
         .filter-card {
             background: var(--carbon-light);
@@ -439,12 +402,12 @@
                             <th>FECHA / GUÍA</th>
                             <th>ACCIÓN / CAT.</th>
                             <th>PROV / TIPO</th>
-                            <th style="text-align:right">ACC</th>
                         </tr>
                     </thead>
                     <tbody id="report-table-body"></tbody>
                 </table>
             </div>
+            <button onclick="resetAllData()" style="padding:12px; background:transparent; color:#8a2929; border:1px solid #8a2929; border-radius:8px; font-weight:bold; margin-top:10px; width: 100%; font-size: 0.8rem; cursor:pointer;">BORRAR TODO</button>
         </div>
 
         <div id="chart-view" class="view">
@@ -482,37 +445,9 @@
         </div>
     </div>
 
-    <!-- Modal de Cámara -->
     <div id="camera-modal">
         <div id="reader"></div>
         <button onclick="stopCamera()" style="margin-top:20px; padding:10px 30px; border-radius:20px; font-weight:bold;">CERRAR</button>
-    </div>
-
-    <!-- Modal de Edición de Guía -->
-    <div id="edit-modal">
-        <div class="edit-card">
-            <h3 style="color: var(--accent); margin: 0 0 10px 0; text-align: center; font-size: 1.1rem;">Editar Guía</h3>
-            
-            <label>NÚMERO DE GUÍA</label>
-            <input type="text" id="edit-guia" autocomplete="off">
-
-            <label>ACCIÓN</label>
-            <select id="edit-accion" onchange="actualizarEditCategorias(false)"></select>
-
-            <label>CATEGORÍA</label>
-            <select id="edit-categoria"></select>
-
-            <label>PROVEEDOR</label>
-            <select id="edit-prov"></select>
-
-            <label>TIPO</label>
-            <select id="edit-tipo"></select>
-
-            <div style="display: flex; gap: 8px; margin-top: 10px;">
-                <button onclick="saveEdit()" style="flex: 1; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">GUARDAR</button>
-                <button onclick="closeEditModal()" style="flex: 1; padding: 12px; background: #333333; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem;">CANCELAR</button>
-            </div>
-        </div>
     </div>
 
     </div><!-- /#app-root -->
@@ -521,24 +456,28 @@
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwe_BKXr_8RhH2TT6vPg-WJGu8ZJpa0-xrDBvFSYba65b82cYzDqFuNwwqLUiCw0HTqDQ/exec";
 
         // ============ CONFIGURACIÓN DE FIREBASE ============
-        const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_PROYECTO.firebaseapp.com",
-            projectId: "TU_PROYECTO",
-            storageBucket: "TU_PROYECTO.appspot.com",
-            messagingSenderId: "TU_SENDER_ID",
-            appId: "TU_APP_ID"
-        };
+        // Reemplaza estos valores con los de TU proyecto (Firebase Console > Configuración del proyecto > tus apps > SDK setup and configuration)
+       const firebaseConfig = {
+    apiKey: "AIzaSyCg9mMvEg4tKa8Qpi3CVx_oTN0GSgO_iJ0",
+    authDomain: "rpkmty.firebaseapp.com",
+    projectId: "rpkmty",
+    storageBucket: "rpkmty.firebasestorage.app",
+    messagingSenderId: "414713465217",
+    appId: "1:414713465217:web:fb642bcfa7cffb665d4080",
+    measurementId: "G-NWBSKBZ2FB"
+};
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Habilita persistencia offline: si el CT40 se queda sin señal, sigue
+        // escaneando local y Firestore sincroniza solo al recuperar conexión.
         db.enablePersistence({ synchronizeTabs: true }).catch(err => {
             console.log("Persistencia offline no disponible en este navegador:", err.code);
         });
 
-        let unsubscribeGuias = null; 
+        let unsubscribeGuias = null; // referencia al listener en tiempo real, para poder apagarlo al cerrar sesión
         let currentUser = null;
 
         const categoriasPorAccion = {
@@ -546,14 +485,13 @@
             "DEVOLUCIÓN A ORIGEN": ["NO MANIFESTADO", "MAL PUNTEADO", "SIN CONTENIDO", "PAQUETE DAÑADO", "EXCESO DE DIMENSIONES", "FUERA DE COBERTURA", "3 INTENTOS", "MAL ENTREGADO", "NEGOCIO CERRADO", "MAL ETIQUETADO", "DOMICILIO INCORRECTO", "RECHAZO"]
         };
 
-        let inventory = {}; 
+        let inventory = {}; // ahora se reconstruye a partir de Firestore, ya no de localStorage
         let currentProv = localStorage.getItem('redpack_last_prov') || 'ROMBO';
         let currentType = localStorage.getItem('redpack_last_type') || 'NO EMBARCADO TR2';
         let currentAccion = localStorage.getItem('redpack_last_accion') || 'INYECCIÓN';
         let currentCategoria = localStorage.getItem('redpack_last_categoria') || 'NO MANIFESTADO';
         let html5QrCode;
         let myChart = null; 
-        let editingGuiaId = null; // Guarda la ID original de la guía que se está editando
 
         // ============ LOGIN CON GOOGLE ============
         function signInWithGoogle() {
@@ -588,6 +526,9 @@
         });
 
         // ============ LISTENER EN TIEMPO REAL DE FIRESTORE ============
+        // Reconstruye el objeto "inventory" (mismo formato que antes, agrupado por
+        // fecha y por lista) a partir de todos los documentos de la colección "guias".
+        // Esto es lo que hace que todos los CT40 vean la misma lista en segundos.
         function iniciarListenerGuias() {
             if (unsubscribeGuias) unsubscribeGuias();
             unsubscribeGuias = db.collection('guias').orderBy('timestamp', 'asc')
@@ -677,6 +618,8 @@
             const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
             const listKey = `${currentAccion} - ${currentCategoria}`;
 
+            // Duplicado: se revisa contra el espejo local (inventory), que ya refleja
+            // en tiempo real lo que todos los demás CT40 han escaneado.
             for (let d in inventory) {
                 for (let L in inventory[d]) {
                     if (inventory[d][L].some(i => i.guia === code)) {
@@ -696,6 +639,9 @@
 
             showStatus(false);
 
+            // El ID del documento es la guía misma: si por una carrera de milisegundos
+            // dos CT40 escanean la misma guía antes de sincronizar, el segundo
+            // simplemente sobrescribe el mismo documento — nunca se duplica.
             db.collection('guias').doc(code).set({
                 ...newItem,
                 dateKey: dateKey,
@@ -728,13 +674,10 @@
 
         document.addEventListener('keydown', (e) => {
             const input = document.getElementById('scanner-input');
-            const activeTag = document.activeElement.tagName;
-            const isEditing = document.getElementById('edit-modal').style.display === 'flex';
-
-            if (activeTag !== 'SELECT' && activeTag !== 'INPUT' && !isEditing && document.getElementById('scanner-view').classList.contains('active')) {
+            if (document.activeElement.tagName !== 'SELECT' && document.getElementById('scanner-view').classList.contains('active')) {
                 input.focus();
             }
-            if (e.key === 'Enter' && !isEditing) {
+            if (e.key === 'Enter') {
                 setTimeout(() => {
                     if (input.value) processScan(input.value);
                     input.value = '';
@@ -785,6 +728,7 @@
             const fType = document.getElementById('filter-type').value;
 
             let rows = [];
+            // Itera a través de todos los días registrados en el inventario
             for (let dateKey in inventory) {
                 const dayData = inventory[dateKey] || {};
                 for (let L in dayData) {
@@ -798,132 +742,11 @@
                             <td><span style="font-size:0.65rem; color:var(--text-dim); display:block;">${dateKey}</span><span class="guia-text">${i.guia}</span></td>
                             <td style="font-size:0.7em">${i.accion}<br><span style="color:var(--accent)">${i.categoria}</span></td>
                             <td style="font-size:0.7em">${i.prov}<br>${i.tipo}</td>
-                            <td style="text-align:right; vertical-align:middle;">
-                                <button onclick="openEditModal('${dateKey}', '${i.guia}', '${i.accion}', '${i.categoria}', '${i.prov}', '${i.tipo}')" style="color:var(--accent); background:none; border:none; font-size:1.1rem; cursor:pointer; padding:5px;">✏️</button>
-                            </td>
                         </tr>`);
                     });
                 }
             }
             document.getElementById('report-table-body').innerHTML = rows.reverse().join('');
-        }
-
-        // ============ LÓGICA DE EDICIÓN (MODAL) ============
-        function openEditModal(dateKey, guia, accion, categoria, prov, tipo) {
-            editingGuiaId = guia; 
-            
-            document.getElementById('edit-guia').value = guia;
-
-            const editAccion = document.getElementById('edit-accion');
-            editAccion.innerHTML = `
-                <option value="INYECCIÓN">INYECCIÓN</option>
-                <option value="DEVOLUCIÓN A ORIGEN">DEVOLUCIÓN A ORIGEN</option>
-            `;
-            editAccion.value = accion;
-
-            const editProv = document.getElementById('edit-prov');
-            editProv.innerHTML = `
-                <option value="ROMBO">ROMBO</option>
-                <option value="QP">QP</option>
-                <option value="EMISSARY">EMISSARY</option>
-                <option value="OTRO">OTRO</option>
-            `;
-            editProv.value = prov;
-
-            const editTipo = document.getElementById('edit-tipo');
-            editTipo.innerHTML = `
-                <option value="NO EMBARCADO TR2">NO EMBARCADO TR2</option>
-                <option value="DEVOLUCIÓN">DEVOLUCIÓN</option>
-                <option value="PAQUETES ROJOS NM">PAQUETES ROJOS NM</option>
-            `;
-            editTipo.value = tipo;
-
-            actualizarEditCategorias(categoria);
-            document.getElementById('edit-modal').style.display = 'flex';
-        }
-
-        function actualizarEditCategorias(categoriaSeleccionada = false) {
-            const accionVal = document.getElementById('edit-accion').value;
-            const editCat = document.getElementById('edit-categoria');
-            const opciones = categoriasPorAccion[accionVal] || [];
-            editCat.innerHTML = opciones.map(cat => `<option value="${cat}">${cat}</option>`).join('');
-            
-            if (categoriaSeleccionada && opciones.includes(categoriaSeleccionada)) {
-                editCat.value = categoriaSeleccionada;
-            } else {
-                editCat.value = opciones[0] || '';
-            }
-        }
-
-        function closeEditModal() {
-            document.getElementById('edit-modal').style.display = 'none';
-            editingGuiaId = null;
-        }
-
-        async function saveEdit() {
-            if (!editingGuiaId) return;
-
-            let newGuia = document.getElementById('edit-guia').value.trim();
-            const newAccion = document.getElementById('edit-accion').value;
-            const newCat = document.getElementById('edit-categoria').value;
-            const newProv = document.getElementById('edit-prov').value;
-            const newTipo = document.getElementById('edit-tipo').value;
-
-            if (!newGuia) {
-                alert("La guía no puede estar vacía.");
-                return;
-            }
-
-            if (newAccion === "INYECCIÓN" && !/^\d{8}$/.test(newGuia)) {
-                alert("ERR: DEBE SER 8 NÚMEROS PARA INYECCIÓN");
-                return;
-            }
-
-            const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
-            const listKey = `${newAccion} - ${newCat}`;
-
-            // Control de duplicados si la guía cambió su valor numérico
-            if (newGuia !== editingGuiaId) {
-                let duplicate = false;
-                for (let d in inventory) {
-                    for (let L in inventory[d]) {
-                        if (inventory[d][L].some(i => i.guia === newGuia)) {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-                }
-                if (duplicate) {
-                    alert("Esa guía ya existe en el sistema.");
-                    return;
-                }
-
-                // Borramos el documento viejo para evitar duplicaciones
-                await db.collection('guias').doc(editingGuiaId).delete().catch(err => console.error(err));
-            }
-
-            const editedItem = {
-                guia: newGuia,
-                prov: newProv,
-                tipo: newTipo,
-                accion: newAccion,
-                categoria: newCat,
-                dateKey: dateKey,
-                listKey: listKey,
-                timestamp: Date.now(),
-                operador: currentUser ? (currentUser.email || currentUser.displayName) : null
-            };
-
-            // Guarda/sobrescribe en Firestore
-            db.collection('guias').doc(newGuia).set(editedItem)
-            .then(() => {
-                closeEditModal();
-                sendToSheetsBackground(dateKey, newGuia, editedItem);
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error al guardar los cambios.");
-            });
         }
 
         function updateChart() {
@@ -1035,6 +858,8 @@
         function selectCategoria(n) { currentCategoria = n; localStorage.setItem('redpack_last_categoria', n); updateUI(); }
 
         function deleteItem(dateKey, code) {
+            // No hace falta tocar "inventory" a mano: al borrar el documento,
+            // el listener en tiempo real actualiza la lista solo (en este y en los demás CT40).
             db.collection('guias').doc(code).delete().catch(err => console.log("Error al borrar:", err));
         }
 
@@ -1055,6 +880,20 @@
             if(id === 'chart-view') {
                 updateChart();
             }
+        }
+
+        async function resetAllData() {
+            if (!confirm("¿Borrar de forma PERMANENTE todo el historial para TODOS los equipos? Esta acción no se puede deshacer.")) return;
+            const snapshot = await db.collection('guias').get();
+            const batchSize = 450; // límite de Firestore es 500 operaciones por batch
+            let docs = snapshot.docs;
+            while (docs.length > 0) {
+                const chunk = docs.splice(0, batchSize);
+                const batch = db.batch();
+                chunk.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+            // El listener en tiempo real limpia "inventory" y la pantalla automáticamente.
         }
 
         window.onload = () => { 
