@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SCANNER V4 - RK</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --primary: #8a2929;
+            --carbon-dark: #121212;
+            --carbon-light: #1e1e1e;
+            --carbon-border: #333333;
+            --accent: #ffc107;
+            --text-main: #e0e0e0;
+            --text-dim: #a0a0a0;
+            --white: #ffffff;
+            --rombo-color: #00d4ff;
+            --qp-color: #ff4444;
+            --emissary-color: #a855f7; 
+            --otro-color: #10b981;
+        }
+
+        body { 
+            font-family: 'Lexend', sans-serif; 
+            margin: 0; 
+            background-color: var(--carbon-dark); 
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body.scan-success { background-color: #064e3b !important; }
+        body.scan-error { background-color: #4c0505 !important; }
+
+        nav { 
+            display: flex; 
+            background: #000000; 
+            padding: 4px;
+            gap: 4px;
+            border-bottom: 1px solid var(--carbon-border);
+        }
+
+        nav button { 
+            flex: 1; 
+            padding: 8px 2px;
+            font-size: 0.75rem;
+            background: var(--carbon-light); 
+            border: 1px solid var(--carbon-border); 
+            border-radius: 6px;
+            color: var(--text-dim); 
+            font-family: 'Lexend', sans-serif;
+            font-weight: 600; 
+            cursor: pointer;
+        }
+
+        nav button.active { 
+            color: var(--white); 
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .container { padding: 8px; flex-grow: 1; overflow-y: auto; }
+        .view { display: none; flex-direction: column; gap: 8px; }
+        .view.active { display: flex; }
+
+        .scan-card {
+            background: var(--carbon-light);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--carbon-border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .select-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        select {
+            background: #000000;
+            color: var(--white);
+            border: 1px solid var(--carbon-border);
+            border-radius: 6px;
+            padding: 8px 4px;
+            font-family: 'Lexend', sans-serif;
+            font-size: 0.85rem;
+            outline: none;
+            flex: 1;
+            width: 50%;
+        }
+
+        #scanner-input {
+            background: #000000;
+            color: var(--white);
+            border: 1px solid var(--carbon-border);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Lexend', sans-serif;
+            font-size: 1rem;
+            flex-grow: 1;
+        }
+
+        .btn-cam {
+            background: var(--primary);
+            color: white; border: none; border-radius: 6px;
+            padding: 0 15px; font-size: 1.2em;
+        }
+
+        .list-section {
+            background: var(--carbon-light);
+            border-radius: 8px;
+            border: 1px solid var(--carbon-border);
+            overflow: hidden;
+            max-height: 45vh;
+            overflow-y: auto;
+        }
+
+        .list-header {
+            background: #252525;
+            padding: 6px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 6px 4px; font-size: 0.60em; color: var(--text-dim); border-bottom: 1px solid var(--carbon-border); }
+        td { padding: 6px 4px; border-bottom: 1px solid #1a1a1a; font-size: 0.74em; vertical-align: middle; }
+        
+        .guia-text { font-weight: 600; color: var(--white); }
+        .badge-prov { font-size: 0.75em; padding: 2px 4px; border-radius: 3px; font-weight: bold; display: inline-block; }
+        .badge-type { font-size: 0.75em; padding: 2px 4px; border-radius: 3px; background: #333; color: #fff; display: inline-block; }
+        
+        .badge-rombo { color: var(--rombo-color); }
+        .badge-qp { color: var(--qp-color); }
+        .badge-emissary { color: var(--white); background: var(--emissary-color); }
+        .badge-otro { color: var(--white); background: var(--otro-color); }
+
+        #error-toast {
+            display: none; position: fixed; top: 15%; left: 50%; transform: translateX(-50%);
+            background: #ff4444; color: white; padding: 10px 20px; border-radius: 20px;
+            font-weight: bold; z-index: 2000; font-size: 0.8rem; text-align: center; width: 80%;
+        }
+
+        #camera-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 1000;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        #reader { width: 90%; border-radius: 10px; border: 1px solid var(--carbon-border); }
+
+        .filter-card {
+            background: var(--carbon-light);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--carbon-border);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filter-card select {
+            font-size: 0.75rem;
+            padding: 5px;
+        }
+
+        .chart-container {
+            position: relative;
+            margin: 10px auto;
+            height: 250px;
+            width: 250px;
+            background: var(--carbon-light);
+            border-radius: 8px;
+            padding: 10px;
+            border: 1px solid var(--carbon-border);
+        }
+
+        .chart-legend-list {
+            background: var(--carbon-light);
+            border: 1px solid var(--carbon-border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .legend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .legend-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .legend-badge {
+            background: #000000;
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            border: 1px solid var(--carbon-border);
+        }
+
+        #login-screen {
+            display: flex;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--carbon-dark);
+            z-index: 3000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #login-screen h1 { font-size: 1.1rem; color: var(--white); margin: 0; }
+        #login-screen p { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 10px 0; }
+        #btn-google-login {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--white); color: #1f1f1f;
+            border: none; border-radius: 8px;
+            padding: 12px 22px; font-size: 0.9rem; font-weight: 600;
+            font-family: 'Lexend', sans-serif; cursor: pointer;
+        }
+        #login-status { font-size: 0.75rem; color: var(--accent); min-height: 1em; }
+
+        #app-root { display: none; flex-direction: column; height: 100vh; }
+
+        #user-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #000000; padding: 6px 10px; font-size: 0.65rem;
+            color: var(--text-dim); border-bottom: 1px solid var(--carbon-border);
+        }
+        #user-bar #btn-logout {
+            background: transparent; border: 1px solid var(--carbon-border);
+            color: var(--text-dim); border-radius: 5px; padding: 4px 8px;
+            font-size: 0.65rem; font-family: 'Lexend', sans-serif; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <h1>SCANNER V4 - RK</h1>
+        <p>Inicia sesión con tu cuenta de Google para escanear</p>
+        <button id="btn-google-login" onclick="signInWithGoogle()">Iniciar sesión con Google</button>
+        <div id="login-status"></div>
+    </div>
+
+    <div id="app-root">
+
+    <div id="error-toast">DUPLICADO O FORMATO INVÁLIDO</div>
+
+    <div id="user-bar">
+        <span id="user-email"></span>
+        <button id="btn-logout" onclick="logout()">CERRAR SESIÓN</button>
+    </div>
+
+    <nav>
+        <button onclick="showView('scanner-view')" id="nav-scanner" class="active">ESCÁNER</button>
+        <button onclick="showView('report-view')" id="nav-report">HISTORIAL</button>
+        <button onclick="showView('chart-view')" id="nav-chart">ESTADÍSTICAS</button>
+    </nav>
+
+    <div class="container">
+        <div id="scanner-view" class="view active">
+            <div class="scan-card">
+                <div class="select-group">
+                    <div class="select-row">
+                        <select id="prov-select" onchange="selectProv(this.value)">
+                            <option value="ROMBO">ROMBO</option>
+                            <option value="QP">QP</option>
+                            <option value="EMISSARY">EMISSARY</option>
+                            <option value="OTRO">OTRO</option>
+                        </select>
+
+                        <select id="type-select" onchange="selectType(this.value)">
+                            <option value="NO EMBARCADO TR2">NO EMBARCADO TR2</option>
+                            <option value="DEVOLUCIÓN">DEVOLUCIÓN</option>
+                            <option value="PAQUETES ROJOS NM">PAQUETES ROJOS NM</option>
+                        </select>
+                    </div>
+
+                    <div class="select-row">
+                        <select id="accion-select" onchange="selectAccion(this.value)">
+                            <option value="INYECCIÓN">INYECCIÓN</option>
+                            <option value="DEVOLUCIÓN A ORIGEN">DEVOLUCIÓN A ORIGEN</option>
+                        </select>
+
+                        <select id="categoria-select" onchange="selectCategoria(this.value)">
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="scanner-input" placeholder="Guía..." autofocus autocomplete="off">
+                    <button class="btn-cam" onclick="startCamera()">📷</button>
+                </div>
+            </div>
+
+            <div class="list-section">
+                <div class="list-header">
+                    <span id="list-title" style="font-weight:600; font-size:0.8em;">Lista Actual</span>
+                    <span id="count-per-list" style="background:var(--primary); padding:2px 6px; border-radius:8px; font-size:0.7em;">0</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>GUÍA</th>
+                            <th>ACCIÓN</th>
+                            <th>CATEGORÍA</th>
+                            <th>PROVEEDOR</th>
+                            <th>TIPO</th>
+                            <th style="text-align:right">ACC</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scanned-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="report-view" class="view">
+            <div class="filter-card">
+                <span style="font-size:0.7rem; font-weight:600; color:var(--accent);">FILTRAR COLUMNAS:</span>
+                <div class="select-row">
+                    <select id="filter-accion" onchange="renderReport()">
+                        <option value="TODOS">ACCIÓN (TODOS)</option>
+                        <option value="INYECCIÓN">INYECCIÓN</option>
+                        <option value="DEVOLUCIÓN A ORIGEN">DEVOLUCIÓN A ORIGEN</option>
+                    </select>
+                    <select id="filter-categoria" onchange="renderReport()">
+                        <option value="TODOS">CATEGORÍA (TODOS)</option>
+                        <option value="NO MANIFESTADO">NO MANIFESTADO</option>
+                        <option value="MAL PUNTEADO">MAL PUNTEADO</option>
+                        <option value="ANDEN INCORRECTO">ANDEN INCORRECTO</option>
+                        <option value="REINTENTO">REINTENTO</option>
+                        <option value="SIN CONTENIDO">SIN CONTENIDO</option>
+                        <option value="PAQUETE DAÑADO">PAQUETE DAÑADO</option>
+                        <option value="EXCESO DE DIMENSIONES">EXCESO DE DIMENSIONES</option>
+                        <option value="FUERA DE COBERTURA">FUERA DE COBERTURA</option>
+                        <option value="3 INTENTOS">3 INTENTOS</option>
+                        <option value="MAL ENTREGADO">MAL ENTREGADO</option>
+                        <option value="NEGOCIO CERRADO">NEGOCIO CERRADO</option>
+                        <option value="MAL ETIQUETADO">MAL ETIQUETADO</option>
+                        <option value="DOMICILIO INCORRECTO">DOMICILIO INCORRECTO</option>
+                        <option value="RECHAZO">RECHAZO</option>
+                    </select>
+                </div>
+                <div class="select-row">
+                    <select id="filter-prov" onchange="renderReport()">
+                        <option value="TODOS">PROVEEDOR (TODOS)</option>
+                        <option value="ROMBO">ROMBO</option>
+                        <option value="QP">QP</option>
+                        <option value="EMISSARY">EMISSARY</option>
+                        <option value="OTRO">OTRO</option>
+                    </select>
+                    <select id="filter-type" onchange="renderReport()">
+                        <option value="TODOS">TIPO (TODOS)</option>
+                        <option value="NO EMBARCADO TR2">NO EMBARCADO TR2</option>
+                        <option value="DEVOLUCIÓN">DEVOLUCIÓN</option>
+                        <option value="PAQUETES ROJOS NM">PAQUETES ROJOS NM</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 4px; margin-bottom: 2px;">
+                <button class="btn-copy" onclick="copyToSheets()" style="padding: 10px; font-size: 0.7rem; background: var(--primary); color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">📋 COPIAR DATOS</button>
+            </div>
+            
+            <div class="list-section">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>FECHA / GUÍA</th>
+                            <th>ACCIÓN / CAT.</th>
+                            <th>PROV / TIPO</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body"></tbody>
+                </table>
+            </div>
+            <button onclick="resetAllData()" style="padding:12px; background:transparent; color:#8a2929; border:1px solid #8a2929; border-radius:8px; font-weight:bold; margin-top:10px; width: 100%; font-size: 0.8rem; cursor:pointer;">BORRAR TODO</button>
+        </div>
+
+        <div id="chart-view" class="view">
+            <div style="text-align: center; margin-top: 5px;">
+                <h3 style="margin: 5px 0; font-size: 1rem; color: var(--accent);">Estadísticas por Tipo</h3>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="donutChart"></canvas>
+            </div>
+
+            <div class="chart-legend-list">
+                <div class="legend-item">
+                    <div class="legend-label">
+                        <div class="legend-color-dot" style="background: #00d4ff;"></div>
+                        <span style="color: var(--text-main);">NO EMBARCADO TR2</span>
+                    </div>
+                    <span id="badge-tr2" class="legend-badge">0</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-label">
+                        <div class="legend-color-dot" style="background: #ff4444;"></div>
+                        <span style="color: var(--text-main);">DEVOLUCIÓN</span>
+                    </div>
+                    <span id="badge-dev" class="legend-badge">0</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-label">
+                        <div class="legend-color-dot" style="background: #a855f7;"></div>
+                        <span style="color: var(--text-main);">PAQUETES ROJOS NM</span>
+                    </div>
+                    <span id="badge-rojos" class="legend-badge">0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="camera-modal">
+        <div id="reader"></div>
+        <button onclick="stopCamera()" style="margin-top:20px; padding:10px 30px; border-radius:20px; font-weight:bold;">CERRAR</button>
+    </div>
+
+    </div><!-- /#app-root -->
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwe_BKXr_8RhH2TT6vPg-WJGu8ZJpa0-xrDBvFSYba65b82cYzDqFuNwwqLUiCw0HTqDQ/exec";
+
+        // ============ CONFIGURACIÓN DE FIREBASE ============
+        // Reemplaza estos valores con los de TU proyecto (Firebase Console > Configuración del proyecto > tus apps > SDK setup and configuration)
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Habilita persistencia offline: si el CT40 se queda sin señal, sigue
+        // escaneando local y Firestore sincroniza solo al recuperar conexión.
+        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+            console.log("Persistencia offline no disponible en este navegador:", err.code);
+        });
+
+        let unsubscribeGuias = null; // referencia al listener en tiempo real, para poder apagarlo al cerrar sesión
+        let currentUser = null;
+
+        const categoriasPorAccion = {
+            "INYECCIÓN": ["NO MANIFESTADO", "MAL PUNTEADO", "ANDEN INCORRECTO", "REINTENTO", "NEGOCIO CERRADO", "MAL ETIQUETADO"],
+            "DEVOLUCIÓN A ORIGEN": ["NO MANIFESTADO", "MAL PUNTEADO", "SIN CONTENIDO", "PAQUETE DAÑADO", "EXCESO DE DIMENSIONES", "FUERA DE COBERTURA", "3 INTENTOS", "MAL ENTREGADO", "NEGOCIO CERRADO", "MAL ETIQUETADO", "DOMICILIO INCORRECTO", "RECHAZO"]
+        };
+
+        let inventory = {}; // ahora se reconstruye a partir de Firestore, ya no de localStorage
+        let currentProv = localStorage.getItem('redpack_last_prov') || 'ROMBO';
+        let currentType = localStorage.getItem('redpack_last_type') || 'NO EMBARCADO TR2';
+        let currentAccion = localStorage.getItem('redpack_last_accion') || 'INYECCIÓN';
+        let currentCategoria = localStorage.getItem('redpack_last_categoria') || 'NO MANIFESTADO';
+        let html5QrCode;
+        let myChart = null; 
+
+        // ============ LOGIN CON GOOGLE ============
+        function signInWithGoogle() {
+            document.getElementById('login-status').textContent = "Abriendo ventana de Google...";
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(err => {
+                console.error(err);
+                document.getElementById('login-status').textContent = "Error al iniciar sesión: " + err.message;
+            });
+        }
+
+        function logout() {
+            if (unsubscribeGuias) { unsubscribeGuias(); unsubscribeGuias = null; }
+            auth.signOut();
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-root').style.display = 'flex';
+                document.getElementById('user-email').textContent = user.email || user.displayName || '';
+                iniciarListenerGuias();
+            } else {
+                currentUser = null;
+                if (unsubscribeGuias) { unsubscribeGuias(); unsubscribeGuias = null; }
+                inventory = {};
+                document.getElementById('app-root').style.display = 'none';
+                document.getElementById('login-screen').style.display = 'flex';
+                document.getElementById('login-status').textContent = '';
+            }
+        });
+
+        // ============ LISTENER EN TIEMPO REAL DE FIRESTORE ============
+        // Reconstruye el objeto "inventory" (mismo formato que antes, agrupado por
+        // fecha y por lista) a partir de todos los documentos de la colección "guias".
+        // Esto es lo que hace que todos los CT40 vean la misma lista en segundos.
+        function iniciarListenerGuias() {
+            if (unsubscribeGuias) unsubscribeGuias();
+            unsubscribeGuias = db.collection('guias').orderBy('timestamp', 'asc')
+                .onSnapshot(snapshot => {
+                    const nuevoInventory = {};
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        if (!nuevoInventory[d.dateKey]) nuevoInventory[d.dateKey] = {};
+                        if (!nuevoInventory[d.dateKey][d.listKey]) nuevoInventory[d.dateKey][d.listKey] = [];
+                        nuevoInventory[d.dateKey][d.listKey].push({
+                            guia: d.guia, prov: d.prov, tipo: d.tipo, accion: d.accion, categoria: d.categoria
+                        });
+                    });
+                    inventory = nuevoInventory;
+                    updateUI();
+                }, err => {
+                    console.error("Error de sincronización con Firestore:", err);
+                });
+        }
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeep(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === 'success') {
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        function showStatus(isError, msg) {
+            if (isError) {
+                const toast = document.getElementById('error-toast');
+                toast.textContent = msg;
+                toast.style.display = 'block';
+                document.body.classList.add('scan-error');
+                playBeep('error');
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                    document.body.classList.remove('scan-error');
+                }, 1500);
+            } else {
+                document.body.classList.add('scan-success');
+                if (navigator.vibrate) navigator.vibrate(60);
+                playBeep('success');
+                setTimeout(() => document.body.classList.remove('scan-success'), 200);
+            }
+        }
+
+        function actualizarSelectorCategorias(mantenerSeleccion = false) {
+            const selectCat = document.getElementById('categoria-select');
+            const opciones = categoriasPorAccion[currentAccion] || [];
+            selectCat.innerHTML = opciones.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            
+            if (mantenerSeleccion && opciones.includes(currentCategoria)) {
+                selectCat.value = currentCategoria;
+            } else {
+                currentCategoria = opciones[0] || '';
+                localStorage.setItem('redpack_last_categoria', currentCategoria);
+                selectCat.value = currentCategoria;
+            }
+        }
+
+        async function processScan(code) {
+            code = code.trim();
+            if (!code) return;
+
+            if (currentAccion === "INYECCIÓN") {
+                if (!/^\d{8}$/.test(code)) {
+                    showStatus(true, "ERR: DEBE SER 8 NÚMEROS");
+                    return;
+                }
+            } else {
+                if (code.length === 0) return;
+            }
+
+            const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
+            const listKey = `${currentAccion} - ${currentCategoria}`;
+
+            // Duplicado: se revisa contra el espejo local (inventory), que ya refleja
+            // en tiempo real lo que todos los demás CT40 han escaneado.
+            for (let d in inventory) {
+                for (let L in inventory[d]) {
+                    if (inventory[d][L].some(i => i.guia === code)) {
+                        showStatus(true, "DUPLICADO EN: " + L + " (" + d + ")");
+                        return;
+                    }
+                }
+            }
+
+            const newItem = { 
+                guia: code, 
+                prov: currentProv, 
+                tipo: currentType,
+                accion: currentAccion,
+                categoria: currentCategoria
+            };
+
+            showStatus(false);
+
+            // El ID del documento es la guía misma: si por una carrera de milisegundos
+            // dos CT40 escanean la misma guía antes de sincronizar, el segundo
+            // simplemente sobrescribe el mismo documento — nunca se duplica.
+            db.collection('guias').doc(code).set({
+                ...newItem,
+                dateKey: dateKey,
+                listKey: listKey,
+                timestamp: Date.now(),
+                operador: currentUser ? (currentUser.email || currentUser.displayName) : null
+            }).catch(err => console.log("Guardado en cola offline, se sincronizará al recuperar señal:", err));
+
+            sendToSheetsBackground(dateKey, code, newItem);
+        }
+
+        function sendToSheetsBackground(dateKey, code, itemData) {
+            const datosParaEnvio = new URLSearchParams({
+                fecha: dateKey,
+                guia: code,
+                accion: itemData.accion,
+                categoria: itemData.categoria,
+                proveedor: itemData.prov,
+                tipo: itemData.tipo
+            });
+
+            fetch(WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: datosParaEnvio.toString()
+            })
+            .catch(err => console.log("Error de red, guardado local asegurado..."));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const input = document.getElementById('scanner-input');
+            if (document.activeElement.tagName !== 'SELECT' && document.getElementById('scanner-view').classList.contains('active')) {
+                input.focus();
+            }
+            if (e.key === 'Enter') {
+                setTimeout(() => {
+                    if (input.value) processScan(input.value);
+                    input.value = '';
+                }, 50);
+            }
+        });
+
+        function updateUI() {
+            const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
+            const dayData = inventory[dateKey] || {};
+            const listKey = `${currentAccion} - ${currentCategoria}`;
+            const list = dayData[listKey] || [];
+            
+            document.getElementById('list-title').textContent = `${currentAccion} (${currentCategoria})`;
+            document.getElementById('count-per-list').textContent = list.length;
+            
+            document.getElementById('prov-select').value = currentProv;
+            document.getElementById('type-select').value = currentType;
+            document.getElementById('accion-select').value = currentAccion;
+            
+            document.getElementById('scanned-list-body').innerHTML = list.slice(-8).map(i => {
+                let badgeClass = 'badge-rombo';
+                if(i.prov === 'QP') badgeClass = 'badge-qp';
+                if(i.prov === 'EMISSARY') badgeClass = 'badge-emissary';
+                if(i.prov === 'OTRO') badgeClass = 'badge-otro';
+
+                return `
+                <tr>
+                    <td><span class="guia-text">${i.guia}</span></td>
+                    <td><span style="color:#ffffff; font-size:0.85em; font-weight:600;">${i.accion}</span></td>
+                    <td><span style="color:var(--accent); font-size:0.85em;">${i.categoria}</span></td>
+                    <td><span class="badge-prov ${badgeClass}">${i.prov}</span></td>
+                    <td><span class="badge-type">${i.tipo}</span></td>
+                    <td style="text-align:right">
+                        <button onclick="deleteItem('${dateKey}', '${i.guia}')" style="color:#8a2929; background:none; border:none; font-weight:bold; font-size:1.1rem; cursor:pointer;">✕</button>
+                    </td>
+                </tr>`;
+            }).reverse().join('');
+            
+            renderReport();
+            updateChart(); 
+        }
+
+        function renderReport() {
+            const fAccion = document.getElementById('filter-accion').value;
+            const fCategoria = document.getElementById('filter-categoria').value;
+            const fProv = document.getElementById('filter-prov').value;
+            const fType = document.getElementById('filter-type').value;
+
+            let rows = [];
+            // Itera a través de todos los días registrados en el inventario
+            for (let dateKey in inventory) {
+                const dayData = inventory[dateKey] || {};
+                for (let L in dayData) {
+                    dayData[L].forEach(i => {
+                        if (fAccion !== "TODOS" && i.accion !== fAccion) return;
+                        if (fCategoria !== "TODOS" && i.categoria !== fCategoria) return;
+                        if (fProv !== "TODOS" && i.prov !== fProv) return;
+                        if (fType !== "TODOS" && i.tipo !== fType) return;
+
+                        rows.push(`<tr>
+                            <td><span style="font-size:0.65rem; color:var(--text-dim); display:block;">${dateKey}</span><span class="guia-text">${i.guia}</span></td>
+                            <td style="font-size:0.7em">${i.accion}<br><span style="color:var(--accent)">${i.categoria}</span></td>
+                            <td style="font-size:0.7em">${i.prov}<br>${i.tipo}</td>
+                        </tr>`);
+                    });
+                }
+            }
+            document.getElementById('report-table-body').innerHTML = rows.reverse().join('');
+        }
+
+        function updateChart() {
+            let totalGuias = 0;
+            let countTr2 = 0;
+            let countDev = 0;
+            let countRojos = 0;
+
+            for (let dateKey in inventory) {
+                const dayData = inventory[dateKey] || {};
+                for (let L in dayData) {
+                    dayData[L].forEach(i => {
+                        totalGuias++;
+                        if (i.tipo === "NO EMBARCADO TR2") countTr2++;
+                        else if (i.tipo === "DEVOLUCIÓN") countDev++;
+                        else if (i.tipo === "PAQUETES ROJOS NM") countRojos++;
+                    });
+                }
+            }
+
+            document.getElementById('badge-tr2').textContent = countTr2;
+            document.getElementById('badge-dev').textContent = countDev;
+            document.getElementById('badge-rojos').textContent = countRojos;
+
+            const ctx = document.getElementById('donutChart').getContext('2d');
+            
+            if (myChart) {
+                myChart.data.datasets[0].data = [countTr2, countDev, countRojos];
+                myChart.options.plugins.centerText.text = totalGuias.toString();
+                myChart.update();
+            } else {
+                const centerTextPlugin = {
+                    id: 'centerText',
+                    beforeDraw: function(chart) {
+                        var width = chart.width,
+                            height = chart.height,
+                            ctx = chart.ctx;
+                        ctx.restore();
+                        
+                        var fontSize = (height / 100).toFixed(2);
+                        ctx.font = "bold " + fontSize + "em Lexend, sans-serif";
+                        ctx.textBaseline = "middle";
+                        ctx.textAlign = "center";
+                        ctx.fillStyle = "#ffffff";
+                        
+                        var text = chart.options.plugins.centerText.text || "0";
+                        var textX = width / 2;
+                        var textY = height / 2;
+                        
+                        ctx.fillText(text, textX, textY);
+                        ctx.save();
+                    }
+                };
+
+                myChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['NO EMBARCADO TR2', 'DEVOLUCIÓN', 'PAQUETES ROJOS NM'],
+                        datasets: [{
+                            data: [countTr2, countDev, countRojos],
+                            backgroundColor: ['#00d4ff', '#ff4444', '#a855f7'],
+                            borderColor: '#1e1e1e',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '75%', 
+                        plugins: {
+                            legend: {
+                                display: false 
+                            },
+                            centerText: {
+                                text: totalGuias.toString()
+                            }
+                        }
+                    },
+                    plugins: [centerTextPlugin]
+                });
+            }
+        }
+
+        function copyToSheets() {
+            let tsv = "";
+            for (let dateKey in inventory) {
+                const dayData = inventory[dateKey] || {};
+                for (let L in dayData) {
+                    dayData[L].forEach(i => { 
+                        tsv += `${dateKey}\t${i.guia}\t${i.accion}\t${i.categoria}\t${i.prov}\t${i.tipo}\n`; 
+                    });
+                }
+            }
+            if (tsv) {
+                navigator.clipboard.writeText(tsv).then(() => alert("¡Datos de todo el historial copiados!"));
+            } else {
+                alert("No hay datos para copiar.");
+            }
+        }
+
+        function selectProv(n) { currentProv = n; localStorage.setItem('redpack_last_prov', n); }
+        function selectType(n) { currentType = n; localStorage.setItem('redpack_last_type', n); }
+        function selectAccion(n) { 
+            currentAccion = n; 
+            localStorage.setItem('redpack_last_accion', n); 
+            actualizarSelectorCategorias(false); 
+            updateUI(); 
+        }
+        function selectCategoria(n) { currentCategoria = n; localStorage.setItem('redpack_last_categoria', n); updateUI(); }
+
+        function deleteItem(dateKey, code) {
+            // No hace falta tocar "inventory" a mano: al borrar el documento,
+            // el listener en tiempo real actualiza la lista solo (en este y en los demás CT40).
+            db.collection('guias').doc(code).delete().catch(err => console.log("Error al borrar:", err));
+        }
+
+        function startCamera() {
+            document.getElementById('camera-modal').style.display = 'flex';
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: 200 }, (t) => { processScan(t); stopCamera(); });
+        }
+
+        function stopCamera() { if (html5QrCode) html5QrCode.stop().then(() => document.getElementById('camera-modal').style.display = 'none'); }
+
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('nav-' + id.split('-')[0]).classList.add('active');
+            
+            if(id === 'chart-view') {
+                updateChart();
+            }
+        }
+
+        async function resetAllData() {
+            if (!confirm("¿Borrar de forma PERMANENTE todo el historial para TODOS los equipos? Esta acción no se puede deshacer.")) return;
+            const snapshot = await db.collection('guias').get();
+            const batchSize = 450; // límite de Firestore es 500 operaciones por batch
+            let docs = snapshot.docs;
+            while (docs.length > 0) {
+                const chunk = docs.splice(0, batchSize);
+                const batch = db.batch();
+                chunk.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+            // El listener en tiempo real limpia "inventory" y la pantalla automáticamente.
+        }
+
+        window.onload = () => { 
+            actualizarSelectorCategorias(true);
+            document.getElementById('scanner-input').focus(); 
+        };
+    </script>
+</body>
+</html>
