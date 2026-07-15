@@ -407,7 +407,6 @@
                     <tbody id="report-table-body"></tbody>
                 </table>
             </div>
-            <button onclick="resetAllData()" style="padding:12px; background:transparent; color:#8a2929; border:1px solid #8a2929; border-radius:8px; font-weight:bold; margin-top:10px; width: 100%; font-size: 0.8rem; cursor:pointer;">BORRAR TODO</button>
         </div>
 
         <div id="chart-view" class="view">
@@ -458,13 +457,12 @@
         // ============ CONFIGURACIÓN DE FIREBASE ============
         // Reemplaza estos valores con los de TU proyecto (Firebase Console > Configuración del proyecto > tus apps > SDK setup and configuration)
         const firebaseConfig = {
-    apiKey: "AIzaSyCg9mMvEg4tKa8Qpi3CVx_oTN0GSgO_iJ0",
-    authDomain: "rpkmty.firebaseapp.com",
-    projectId: "rpkmty",
-    storageBucket: "rpkmty.firebasestorage.app",
-    messagingSenderId: "414713465217",
-    appId: "1:414713465217:web:fb642bcfa7cffb665d4080",
-    measurementId: "G-NWBSKBZ2FB"
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_SENDER_ID",
+            appId: "TU_APP_ID"
         };
 
         firebase.initializeApp(firebaseConfig);
