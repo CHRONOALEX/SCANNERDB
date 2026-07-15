@@ -407,8 +407,6 @@
                     <tbody id="report-table-body"></tbody>
                 </table>
             </div>
-            <button onclick="resetAllData()" style="padding:12px; background:transparent; color:#8a2929; border:1px solid #8a2929; border-radius:8px; font-weight:bold; margin-top:10px; width: 100%; font-size: 0.8rem; cursor:pointer;">BORRAR TODO</button>
-        </div>
 
         <div id="chart-view" class="view">
             <div style="text-align: center; margin-top: 5px;">
@@ -882,19 +880,6 @@
             }
         }
 
-        async function resetAllData() {
-            if (!confirm("¿Borrar de forma PERMANENTE todo el historial para TODOS los equipos? Esta acción no se puede deshacer.")) return;
-            const snapshot = await db.collection('guias').get();
-            const batchSize = 450; // límite de Firestore es 500 operaciones por batch
-            let docs = snapshot.docs;
-            while (docs.length > 0) {
-                const chunk = docs.splice(0, batchSize);
-                const batch = db.batch();
-                chunk.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-            }
-            // El listener en tiempo real limpia "inventory" y la pantalla automáticamente.
-        }
 
         window.onload = () => { 
             actualizarSelectorCategorias(true);
