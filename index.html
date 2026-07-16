@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SCANNER V4.1 - RK</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%2218%22%20y%3D%224%22%20width%3D%2228%22%20height%3D%2248%22%20rx%3D%227%22%20fill%3D%22%23111111%22%20stroke%3D%22%23000000%22%20stroke-width%3D%221%22/%3E%3Crect%20x%3D%2222%22%20y%3D%229%22%20width%3D%2220%22%20height%3D%2214%22%20rx%3D%222%22%20fill%3D%22%23050505%22/%3E%3Crect%20x%3D%2220%22%20y%3D%2227%22%20width%3D%2224%22%20height%3D%223%22%20rx%3D%221%22%20fill%3D%22%23ff2b2b%22/%3E%3Crect%20x%3D%227%22%20y%3D%2227%22%20width%3D%2210%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23ff2b2b%22%20opacity%3D%220.85%22/%3E%3Crect%20x%3D%2247%22%20y%3D%2227%22%20width%3D%2210%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23ff2b2b%22%20opacity%3D%220.85%22/%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2245%22%20r%3D%223%22%20fill%3D%22%23333333%22/%3E%3Cpath%20d%3D%22M20%2054%20q12%2012%2024%200%20l0%204%20q-12%2010%20-24%200%20z%22%20fill%3D%22%23111111%22/%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -264,6 +265,12 @@
             color: var(--text-dim); border-radius: 5px; padding: 4px 8px;
             font-size: 0.65rem; font-family: 'Lexend', sans-serif; cursor: pointer;
         }
+        #total-hoy-badge {
+            font-size: 0.6rem; color: var(--accent); font-weight: 600;
+            background: rgba(255, 193, 7, 0.08); border: 1px solid rgba(255, 193, 7, 0.25);
+            padding: 3px 7px; border-radius: 10px; white-space: nowrap;
+        }
+        #total-hoy-badge b { font-weight: 800; }
     </style>
 </head>
 <body>
@@ -281,6 +288,7 @@
 
     <div id="user-bar">
         <span id="user-email"></span>
+        <span id="total-hoy-badge" title="Total de guías escaneadas hoy">HOY: <b id="total-hoy-num">0</b></span>
         <button id="btn-logout" onclick="logout()">CERRAR SESIÓN</button>
     </div>
 
@@ -408,9 +416,12 @@
                 </table>
             </div>
 
+        </div><!-- /#report-view -->
+
         <div id="chart-view" class="view">
             <div style="text-align: center; margin-top: 5px;">
-                <h3 style="margin: 5px 0; font-size: 1rem; color: var(--accent);">Estadísticas por Tipo</h3>
+                <h3 style="margin: 5px 0; font-size: 1rem; color: var(--accent);">Estadísticas de Hoy</h3>
+                <span style="font-size: 0.65rem; color: var(--text-dim);">Total de pedidos escaneados hoy</span>
             </div>
             
             <div class="chart-container">
@@ -616,14 +627,15 @@
             const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
             const listKey = `${currentAccion} - ${currentCategoria}`;
 
-            // Duplicado: se revisa contra el espejo local (inventory), que ya refleja
-            // en tiempo real lo que todos los demás CT40 han escaneado.
-            for (let d in inventory) {
-                for (let L in inventory[d]) {
-                    if (inventory[d][L].some(i => i.guia === code)) {
-                        showStatus(true, "DUPLICADO EN: " + L + " (" + d + ")");
-                        return;
-                    }
+            // Duplicado: se revisa SOLO contra lo escaneado en el día de hoy (espejo local
+            // "inventory", que refleja en tiempo real lo que todos los CT40 han escaneado).
+            // Si la guía se escaneó en un día anterior (p.ej. volvió como devolución al
+            // día siguiente), NO cuenta como duplicado y puede volver a escanearse.
+            const dayData = inventory[dateKey] || {};
+            for (let L in dayData) {
+                if (dayData[L].some(i => i.guia === code)) {
+                    showStatus(true, "DUPLICADO HOY EN: " + L);
+                    return;
                 }
             }
 
@@ -637,10 +649,13 @@
 
             showStatus(false);
 
-            // El ID del documento es la guía misma: si por una carrera de milisegundos
-            // dos CT40 escanean la misma guía antes de sincronizar, el segundo
-            // simplemente sobrescribe el mismo documento — nunca se duplica.
-            db.collection('guias').doc(code).set({
+            // El ID del documento combina fecha + guía: así cada día tiene su propio
+            // registro independiente. Si dos CT40 escanean la misma guía el mismo día
+            // antes de sincronizar, el segundo sobrescribe el mismo documento (nunca se
+            // duplica ESE día), pero un re-escaneo al día siguiente crea un documento
+            // nuevo sin borrar el historial del día anterior.
+            const docId = `${dateKey.replace(/\//g, '-')}_${code}`;
+            db.collection('guias').doc(docId).set({
                 ...newItem,
                 dateKey: dateKey,
                 listKey: listKey,
@@ -688,6 +703,12 @@
             const dayData = inventory[dateKey] || {};
             const listKey = `${currentAccion} - ${currentCategoria}`;
             const list = dayData[listKey] || [];
+
+            // Total de guías escaneadas HOY (suma de todas las listas del día), para el
+            // badge chiquito de la barra superior.
+            let totalHoy = 0;
+            for (let L in dayData) totalHoy += dayData[L].length;
+            document.getElementById('total-hoy-num').textContent = totalHoy;
             
             document.getElementById('list-title').textContent = `${currentAccion} (${currentCategoria})`;
             document.getElementById('count-per-list').textContent = list.length;
@@ -748,21 +769,21 @@
         }
 
         function updateChart() {
+            const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
+            const dayData = inventory[dateKey] || {};
+
             let totalGuias = 0;
             let countTr2 = 0;
             let countDev = 0;
             let countRojos = 0;
 
-            for (let dateKey in inventory) {
-                const dayData = inventory[dateKey] || {};
-                for (let L in dayData) {
-                    dayData[L].forEach(i => {
-                        totalGuias++;
-                        if (i.tipo === "NO EMBARCADO TR2") countTr2++;
-                        else if (i.tipo === "DEVOLUCIÓN") countDev++;
-                        else if (i.tipo === "PAQUETES ROJOS NM") countRojos++;
-                    });
-                }
+            for (let L in dayData) {
+                dayData[L].forEach(i => {
+                    totalGuias++;
+                    if (i.tipo === "NO EMBARCADO TR2") countTr2++;
+                    else if (i.tipo === "DEVOLUCIÓN") countDev++;
+                    else if (i.tipo === "PAQUETES ROJOS NM") countRojos++;
+                });
             }
 
             document.getElementById('badge-tr2').textContent = countTr2;
@@ -858,7 +879,8 @@
         function deleteItem(dateKey, code) {
             // No hace falta tocar "inventory" a mano: al borrar el documento,
             // el listener en tiempo real actualiza la lista solo (en este y en los demás CT40).
-            db.collection('guias').doc(code).delete().catch(err => console.log("Error al borrar:", err));
+            const docId = `${dateKey.replace(/\//g, '-')}_${code}`;
+            db.collection('guias').doc(docId).delete().catch(err => console.log("Error al borrar:", err));
         }
 
         function startCamera() {
