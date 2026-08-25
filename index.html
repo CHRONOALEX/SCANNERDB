@@ -453,15 +453,18 @@
             }
         });
 
-        // ============ LISTENER EN TIEMPO REAL DE FIRESTORE ============
+        // ============ LISTENER EN TIEMPO REAL DE FIRESTORE (SOLO HOY) ============
         function iniciarListenerGuias() {
             if (unsubscribeGuias) unsubscribeGuias();
-            unsubscribeGuias = db.collection('guias').orderBy('timestamp', 'asc')
+            const dateKeyHoy = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
+            unsubscribeGuias = db.collection('guias')
+                .where('dateKey', '==', dateKeyHoy)
+                .orderBy('timestamp', 'asc')
                 .onSnapshot(snapshot => {
                     const nuevoInventory = {};
+                    nuevoInventory[dateKeyHoy] = {};
                     snapshot.forEach(doc => {
                         const d = doc.data();
-                        if (!nuevoInventory[d.dateKey]) nuevoInventory[d.dateKey] = {};
                         if (!nuevoInventory[d.dateKey][d.listKey]) nuevoInventory[d.dateKey][d.listKey] = [];
                         nuevoInventory[d.dateKey][d.listKey].push({
                             guia: d.guia, prov: d.prov, tipo: d.tipo, accion: d.accion, categoria: d.categoria
@@ -726,20 +729,23 @@
         }
 
         function copyToSheets() {
-            let tsv = "";
-            for (let dateKey in inventory) {
-                const dayData = inventory[dateKey] || {};
-                for (let L in dayData) {
-                    dayData[L].forEach(i => { 
-                        tsv += `${dateKey}\t${i.guia}\t${i.accion}\t${i.categoria}\t${i.prov}\t${i.tipo}\n`; 
-                    });
+            // Consulta el historial completo directo de Firestore bajo demanda,
+            // ya que inventory en memoria ahora solo guarda el día actual (ver iniciarListenerGuias).
+            db.collection('guias').orderBy('timestamp', 'asc').get().then(snapshot => {
+                let tsv = "";
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    tsv += `${d.dateKey}\t${d.guia}\t${d.accion}\t${d.categoria}\t${d.prov}\t${d.tipo}\n`;
+                });
+                if (tsv) {
+                    navigator.clipboard.writeText(tsv).then(() => alert("¡Datos de todo el historial copiados!"));
+                } else {
+                    alert("No hay datos para copiar.");
                 }
-            }
-            if (tsv) {
-                navigator.clipboard.writeText(tsv).then(() => alert("¡Datos de todo el historial copiados!"));
-            } else {
-                alert("No hay datos para copiar.");
-            }
+            }).catch(err => {
+                console.error("Error al obtener historial completo:", err);
+                alert("Error al obtener el historial completo.");
+            });
         }
 
         function selectProv(n) { currentProv = n; localStorage.setItem('redpack_last_prov', n); }
