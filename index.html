@@ -477,14 +477,21 @@
         function iniciarListenerGuias() {
             if (unsubscribeGuias) unsubscribeGuias();
             const dateKeyHoy = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
+            // NOTA: ya NO usamos .orderBy('timestamp') aquí junto con el .where('dateKey', ...).
+            // Combinar where + orderBy sobre campos distintos exige un índice compuesto en
+            // Firestore; si ese índice no existe (o se borra), la consulta falla en silencio
+            // y el listener queda reintentando cada 3s sin traer nunca los datos. Para evitar
+            // depender de ese índice, pedimos solo por dateKey y ordenamos aquí en el cliente.
             unsubscribeGuias = db.collection('guias')
                 .where('dateKey', '==', dateKeyHoy)
-                .orderBy('timestamp', 'asc')
                 .onSnapshot(snapshot => {
+                    const docsHoy = [];
+                    snapshot.forEach(doc => docsHoy.push(doc.data()));
+                    docsHoy.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
                     const nuevoInventory = {};
                     nuevoInventory[dateKeyHoy] = {};
-                    snapshot.forEach(doc => {
-                        const d = doc.data();
+                    docsHoy.forEach(d => {
                         if (!nuevoInventory[d.dateKey][d.listKey]) nuevoInventory[d.dateKey][d.listKey] = [];
                         nuevoInventory[d.dateKey][d.listKey].push({
                             guia: d.guia, prov: d.prov, tipo: d.tipo, accion: d.accion, categoria: d.categoria
