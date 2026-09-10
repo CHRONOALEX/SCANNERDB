@@ -311,6 +311,7 @@
                         <select id="accion-select" onchange="selectAccion(this.value)">
                             <option value="INYECCIÓN">INYECCIÓN</option>
                             <option value="DEVOLUCIÓN A ORIGEN">DEVOLUCIÓN A ORIGEN</option>
+                            <option value="DEVOLUCIÓN A ORIGEN">INY SAMEDAY</option>
                         </select>
 
                         <select id="categoria-select" onchange="selectCategoria(this.value)">
@@ -584,14 +585,14 @@
             code = code.trim();
             if (!code) return;
 
-            if (currentAccion === "INYECCIÓN") {
-                if (!/^\d{8}$/.test(code)) {
-                    showStatus(true, "ERR: DEBE SER 8 NÚMEROS");
-                    return;
-                }
-            } else {
-                if (code.length === 0) return;
-            }
+            if (currentAccion === "INYECCIÓN" || currentAccion === "INY SAMEDAY") {
+            if (!/^\d{8}$/.test(code)) {
+            showStatus(true, "ERR: DEBE SER 8 NÚMEROS");
+         return;
+         }
+         } else {
+         if (code.length === 0) return;
+        }
 
             const dateKey = `${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}`;
             const listKey = `${currentAccion} - ${currentCategoria}`;
