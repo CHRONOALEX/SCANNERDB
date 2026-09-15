@@ -443,20 +443,25 @@
         let html5QrCode;
         let myChart = null; 
 
-        // ============ LOGIN CON GOOGLE ============
+       // ============ LOGIN CON GOOGLE ============
         function signInWithGoogle() {
-            document.getElementById('login-status').textContent = "Abriendo ventana de Google...";
+            document.getElementById('login-status').textContent = "Redirigiendo a Google...";
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch(err => {
-                console.error(err);
-                document.getElementById('login-status').textContent = "Error al iniciar sesión: " + err.message;
-            });
+            auth.signInWithRedirect(provider);
         }
 
         function logout() {
             if (unsubscribeGuias) { unsubscribeGuias(); unsubscribeGuias = null; }
             auth.signOut();
         }
+
+        // Manejar el resultado de la redirección
+        auth.getRedirectResult().catch(err => {
+            console.error(err);
+            if (err.code) {
+                document.getElementById('login-status').textContent = "Error al iniciar sesión: " + err.message;
+            }
+        });
 
         auth.onAuthStateChanged(user => {
             if (user) {
@@ -474,7 +479,6 @@
                 document.getElementById('login-status').textContent = '';
             }
         });
-
         // ============ LISTENER EN TIEMPO REAL DE FIRESTORE (SOLO HOY) ============
         function iniciarListenerGuias() {
             if (unsubscribeGuias) unsubscribeGuias();
